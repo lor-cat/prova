@@ -1,0 +1,240 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+# Baseline: abilita tutte le categorie come warning (i blocchi seguenti sovrascrivono per ID specifico)
+dotnet_analyzer_diagnostic.severity = warning
+dotnet_analyzer_diagnostic.category-Style.severity = warning
+dotnet_analyzer_diagnostic.category-Design.severity = warning
+dotnet_analyzer_diagnostic.category-Usage.severity = warning
+dotnet_analyzer_diagnostic.category-Reliability.severity = warning
+dotnet_analyzer_diagnostic.category-Security.severity = warning
+
+# -----------------------------------------------------------------------
+# Nullability del compilatore (CS86xx) - error
+# Il compilatore segnala assegnazioni e dereferenziazioni null non sicure.
+# Tutti trattati come errori: sono la causa piu' comune di NullReferenceException a runtime.
+# -----------------------------------------------------------------------
+
+dotnet_diagnostic.CS8600.severity = error  # Assegnazione di null a tipo non-nullable
+dotnet_diagnostic.CS8601.severity = error  # Possibile assegnazione di riferimento null
+dotnet_diagnostic.CS8602.severity = error  # Dereferenziazione di un possibile riferimento null
+dotnet_diagnostic.CS8603.severity = error  # Possibile restituzione di riferimento null
+dotnet_diagnostic.CS8618.severity = error  # Membro non-nullable non inizializzato nel costruttore
+dotnet_diagnostic.CS8625.severity = error  # Impossibile convertire literal null in tipo riferimento non-nullable
+
+# -----------------------------------------------------------------------
+# Gestione delle risorse e delle eccezioni (CA2xxx) - error
+# Regole critiche che impediscono leak di risorse o corruzione del runtime.
+# -----------------------------------------------------------------------
+
+dotnet_diagnostic.CA2000.severity = error  # Oggetto IDisposable non rilasciato prima che esca dallo scope
+dotnet_diagnostic.CA2012.severity = error  # Usare ValueTask correttamente (non await due volte, non ignorare)
+dotnet_diagnostic.CA2201.severity = error  # Non generare tipi di eccezione troppo generici (Exception, SystemException)
+dotnet_diagnostic.CA2213.severity = error  # Campi IDisposable non rilasciati nel metodo Dispose
+
+# -----------------------------------------------------------------------
+# Affidabilita' e correttezza (CA1xxx / CA2xxx) - warning
+# Regole che segnalano pattern potenzialmente errati ma non sempre bloccanti.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA1031.severity = warning  # Non intercettare tipi di eccezione generici (catch Exception)
+dotnet_diagnostic.CA1062.severity = warning  # Validare i parametri pubblici prima dell'uso (null check)
+dotnet_diagnostic.CA1305.severity = warning  # Specificare IFormatProvider nelle operazioni di formattazione
+dotnet_diagnostic.CA1307.severity = warning  # Specificare StringComparison nelle comparazioni di stringhe
+dotnet_diagnostic.CA1309.severity = warning  # Usare StringComparison ordinale per confronti non linguistici
+dotnet_diagnostic.CA1310.severity = warning  # Specificare StringComparison per correttezza (es. StartsWith)
+dotnet_diagnostic.CA1416.severity = warning  # Chiamata API limitata a specifiche piattaforme OS
+dotnet_diagnostic.CA1508.severity = warning  # Evitare codice con condizioni always-true o always-false (dead branch)
+dotnet_diagnostic.CA1805.severity = warning  # Non inizializzare esplicitamente al valore di default (ridondante)
+dotnet_diagnostic.CA1822.severity = warning  # Membro che non usa lo stato dell'istanza andrebbe dichiarato static
+dotnet_diagnostic.CA1825.severity = warning  # Evitare allocazioni di array vuoti; usare Array.Empty<T>()
+dotnet_diagnostic.CA1847.severity = warning  # Usare char invece di stringa a singolo carattere in Contains/IndexOf
+dotnet_diagnostic.CA1851.severity = warning  # Possibili enumerazioni multiple di IEnumerable (materializzare prima)
+dotnet_diagnostic.CA1854.severity = warning  # Preferire ContainsKey prima di indicizzare un dizionario
+dotnet_diagnostic.CA2007.severity = warning  # Chiamare ConfigureAwait(false) negli await di librerie
+dotnet_diagnostic.CA2016.severity = warning  # Passare CancellationToken ai metodi che lo accettano
+dotnet_diagnostic.CA2200.severity = warning  # Non usare 'throw ex' (azzera lo stack trace); usare 'throw'
+dotnet_diagnostic.CA2208.severity = warning  # Istanziare ArgumentException con il nome parametro corretto
+dotnet_diagnostic.CA2211.severity = warning  # Campi static non-constant non dovrebbero essere visibili
+dotnet_diagnostic.CA2227.severity = warning  # Le proprieta' di Collection non dovrebbero avere setter pubblici
+dotnet_diagnostic.CA2234.severity = warning  # Passare oggetti System.Uri invece di stringhe URI
+
+# -----------------------------------------------------------------------
+# Sicurezza - baseline (CA2100, CA5xxx) - warning
+# Regole di sicurezza abilitate come warning; le piu' critiche sono elevate
+# a error nei blocchi successivi.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA2100.severity = warning  # Verificare le query SQL per vulnerabilita' di SQL injection
+dotnet_diagnostic.CA5350.severity = warning  # Non usare algoritmi crittografici deboli (3DES)
+dotnet_diagnostic.CA5351.severity = warning  # Non usare algoritmi crittografici rotti (DES, RC2, MD5)
+dotnet_diagnostic.CA5358.severity = warning  # Non usare modalita' di cifratura non sicure (ECB)
+dotnet_diagnostic.CA5364.severity = warning  # Non usare versioni di protocollo di sicurezza obsolete
+dotnet_diagnostic.CA5380.severity = warning  # Non aggiungere certificati al root store del sistema
+dotnet_diagnostic.CA5381.severity = warning  # Non aggiungere certificati al root store in codice accessibile
+dotnet_diagnostic.CA5394.severity = warning  # Non usare Random per operazioni di sicurezza (non criptograficamente sicuro)
+
+# -----------------------------------------------------------------------
+# Diagnostiche IDE incluse nel SARIF - warning
+# Regole di stile/usabilita' del compilatore Roslyn emesse durante la build.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.IDE0005.severity = warning  # Using directive non necessaria (import non usata)
+dotnet_diagnostic.IDE0058.severity = warning  # Il valore restituito dall'espressione non viene mai usato
+dotnet_diagnostic.IDE0060.severity = warning  # Parametro non usato; considerare di rimuoverlo o usare '_'
+dotnet_diagnostic.IDE0063.severity = warning  # Usare 'using' semplice (senza blocco) quando possibile
+dotnet_diagnostic.IDE0066.severity = warning  # Convertire switch statement in switch expression
+dotnet_diagnostic.IDE0071.severity = warning  # Semplificare l'interpolazione di stringa
+dotnet_diagnostic.IDE0072.severity = warning  # Aggiungere i case mancanti in switch expression
+dotnet_diagnostic.IDE0090.severity = warning  # Semplificare new expression (new() con tipo implicito)
+dotnet_diagnostic.IDE0130.severity = warning  # Il namespace non corrisponde alla struttura delle cartelle
+
+# -----------------------------------------------------------------------
+# Stile del codice visibile nell'output CI - warning
+# Convenzioni stilistiche applicate durante la build (non solo in IDE).
+# -----------------------------------------------------------------------
+csharp_style_var_for_built_in_types = true:warning                    # Usare var per i tipi built-in (int, string, ...)
+csharp_style_var_when_type_is_apparent = true:warning                 # Usare var quando il tipo e' evidente dall'espressione
+csharp_style_var_elsewhere = false:warning                            # Non usare var quando il tipo non e' ovvio
+csharp_style_expression_bodied_methods = false:warning                # Non usare metodi lambda-style (leggibilita')
+csharp_style_expression_bodied_properties = true:warning              # Usare proprieta' lambda-style (getter semplici)
+csharp_style_expression_bodied_constructors = false:warning           # Non usare costruttori lambda-style
+csharp_style_null_propagation = true:warning                          # Preferire operatore ?. rispetto a controllo null esplicito
+csharp_style_conditional_delegate_call = true:warning                 # Preferire ?.Invoke() per delegate nullable
+csharp_style_prefer_null_check_over_type_check = true:warning         # Preferire 'is null' rispetto a '== null'
+csharp_style_prefer_pattern_matching = true:warning                   # Preferire pattern matching dove applicabile
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning  # Usare pattern matching invece di 'is' + cast
+csharp_prefer_simple_using_statement = true:warning                   # Usare 'using var' senza blocco dove possibile
+dotnet_style_object_initializer = true:warning                        # Preferire object initializer alla sequenza di assegnazioni
+dotnet_style_collection_initializer = true:warning                    # Preferire collection initializer alla sequenza di Add()
+csharp_style_namespace_declarations = file_scoped:warning             # Usare namespace file-scoped (namespace Foo;)
+
+# -----------------------------------------------------------------------
+# Correttezza difensiva (CA1xxx / CA2xxx) - error
+# Errori logici gravi: ownership di risorse, contratti API, invarianti.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA1001.severity = error  # Tipo con campi IDisposable deve implementare IDisposable
+dotnet_diagnostic.CA1063.severity = error  # Implementare IDisposable correttamente (pattern standard)
+dotnet_diagnostic.CA1065.severity = error  # Non generare eccezioni in costruttori di tipo unexpected (property getter, finalizer)
+dotnet_diagnostic.CA1068.severity = error  # CancellationToken deve essere l'ultimo parametro del metodo
+dotnet_diagnostic.CA1069.severity = error  # Valori duplicati in enum
+dotnet_diagnostic.CA2153.severity = error  # Non intercettare CorruptedState exceptions (es. AccessViolation)
+dotnet_diagnostic.CA2215.severity = error  # Il metodo Dispose deve chiamare base.Dispose()
+dotnet_diagnostic.CA2241.severity = error  # Numero di argomenti non corrispondente al formato stringa
+dotnet_diagnostic.CA2242.severity = error  # Confronto corretto con NaN (usare float.IsNaN, non == NaN)
+dotnet_diagnostic.CA2245.severity = error  # Proprieta' assegnata a se stessa (self-assignment)
+dotnet_diagnostic.CA2246.severity = error  # Assegnazione di simbolo e del suo membro nella stessa istruzione
+
+# -----------------------------------------------------------------------
+# Injection e validazione dell'input (CA3xxx) - error
+# Vulnerabilita' OWASP A03: Injection. Qualsiasi forma di input non sanitizzato
+# che raggiunge un'API critica e' trattata come errore bloccante.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA3001.severity = error  # SQL injection: input utente in query SQL senza parametri
+dotnet_diagnostic.CA3002.severity = error  # XSS: input non codificato scritto nell'output HTML
+dotnet_diagnostic.CA3003.severity = error  # Path traversal: input utente in operazioni su file system
+dotnet_diagnostic.CA3004.severity = error  # Information disclosure: eccezione esposta all'output
+dotnet_diagnostic.CA3005.severity = error  # LDAP injection: input utente in query LDAP
+dotnet_diagnostic.CA3006.severity = error  # Process command injection: input utente in Process.Start
+dotnet_diagnostic.CA3007.severity = error  # Open redirect: input utente in redirect HTTP
+dotnet_diagnostic.CA3008.severity = error  # XPath injection: input utente in query XPath
+dotnet_diagnostic.CA3009.severity = error  # XML injection: input utente in output XML diretto
+dotnet_diagnostic.CA3010.severity = error  # XAML injection: input utente in parser XAML
+dotnet_diagnostic.CA3061.severity = error  # XmlDocument.Load con URL: rischio di SSRF/XXE
+dotnet_diagnostic.CA3075.severity = error  # Configurazione DTD non sicura in XmlDocument (XXE)
+dotnet_diagnostic.CA3076.severity = error  # Esecuzione XSLT non sicura (script abilitati)
+dotnet_diagnostic.CA3077.severity = error  # Configurazione non sicura in API XML derivate (XXE)
+
+# -----------------------------------------------------------------------
+# Crittografia e sicurezza del trasporto - error
+# Vulnerabilita' OWASP A02: Cryptographic Failures.
+# Algoritmi rotti, configurazioni TLS non sicure, validazione certificati disabilitata.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA5359.severity = error  # Validazione del certificato TLS disabilitata (ServerCertificateValidationCallback sempre true)
+dotnet_diagnostic.CA5360.severity = error  # Non chiamare metodi pericolosi nella deserializzazione (ad es. Process.Start)
+dotnet_diagnostic.CA5361.severity = error  # Non disabilitare SChannel Strong Crypto (SCH_USE_STRONG_CRYPTO)
+dotnet_diagnostic.CA5363.severity = error  # Non disabilitare la validazione delle richieste ASP.NET (ValidateRequest=false)
+dotnet_diagnostic.CA5365.severity = error  # Non disabilitare il controllo HTTP Headers in ASP.NET
+dotnet_diagnostic.CA5378.severity = error  # Non disabilitare ServicePointManagerSecurityProtocols
+dotnet_diagnostic.CA5379.severity = error  # Non usare algoritmi di derivazione chiave deboli (es. DES-based KDF)
+dotnet_diagnostic.CA5397.severity = error  # Non usare valori SslProtocols obsoleti/deprecati (SSL3, TLS1.0)
+dotnet_diagnostic.CA5398.severity = error  # Non usare valori SslProtocols hardcoded (usare SslProtocols.None per default OS)
+
+# -----------------------------------------------------------------------
+# Crittografia e sicurezza del trasporto - warning
+# Configurazioni rischiose ma contestuali; richiedono revisione manuale.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA5362.severity = warning  # Ciclo di riferimento in tipo serializzabile (rischio denial-of-service)
+dotnet_diagnostic.CA5366.severity = warning  # Usare XmlReader per la lettura di XmlDocument.Load (XXE)
+dotnet_diagnostic.CA5369.severity = warning  # Usare XmlReader in XmlSerializer.Deserialize
+dotnet_diagnostic.CA5370.severity = warning  # Usare XmlReader in XmlValidatingReader
+dotnet_diagnostic.CA5371.severity = warning  # Usare XmlReader in XmlSchema.Read
+dotnet_diagnostic.CA5372.severity = warning  # Usare XmlReader in XPathDocument
+dotnet_diagnostic.CA5373.severity = warning  # Non usare funzioni di derivazione chiave obsolete (PasswordDeriveBytes)
+dotnet_diagnostic.CA5374.severity = warning  # Non usare XslTransform (obsoleto e insicuro)
+dotnet_diagnostic.CA5376.severity = warning  # Usare SharedAccessProtocol.HttpsOnly per SAS di Azure Storage
+dotnet_diagnostic.CA5382.severity = warning  # Usare cookie sicuri (Secure=true) in ASP.NET Core
+dotnet_diagnostic.CA5383.severity = warning  # Possibile mancanza del flag Secure nei cookie ASP.NET Core
+dotnet_diagnostic.CA5384.severity = warning  # Non usare DSA (algoritmo di firma debole)
+dotnet_diagnostic.CA5385.severity = warning  # Usare RSA con key size >= 2048 bit
+dotnet_diagnostic.CA5386.severity = warning  # Evitare SecurityProtocolType hardcoded; lasciare il default OS
+dotnet_diagnostic.CA5387.severity = warning  # Numero di iterazioni KDF insufficiente (Rfc2898DeriveBytes < 100000)
+dotnet_diagnostic.CA5388.severity = warning  # Verificare che le iterazioni KDF siano sufficienti
+dotnet_diagnostic.CA5389.severity = warning  # Non aggiungere il path di un archivio Zip al path di destinazione (Zip Slip)
+dotnet_diagnostic.CA5390.severity = warning  # Non usare chiavi di cifratura hardcoded nel codice sorgente
+dotnet_diagnostic.CA5393.severity = warning  # Non usare valori DllImportSearchPath non sicuri
+dotnet_diagnostic.CA5396.severity = warning  # Impostare HttpOnly=true nei cookie per impedire accesso da JavaScript
+dotnet_diagnostic.CA5399.severity = warning  # HttpClient.CheckCertificateRevocationList deve essere abilitato
+dotnet_diagnostic.CA5400.severity = warning  # Verificare che HttpClient.CheckCertificateRevocationList non sia disabilitato
+dotnet_diagnostic.CA5401.severity = warning  # Non usare HttpClient con handler custom che disabilita il CRL check
+dotnet_diagnostic.CA5402.severity = warning  # Non usare CreateEncryptor con IV non-default in modo non sicuro
+dotnet_diagnostic.CA5403.severity = warning  # Non hardcodare valori di certificato (byte array) nel sorgente
+
+# -----------------------------------------------------------------------
+# Design e contratti API (CA1xxx) - warning
+# Regole che guidano verso API pubbliche ben progettate e manutenibili.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA1002.severity = warning  # Non esporre List<T> come tipo di ritorno pubblico; usare IList/IReadOnlyList
+dotnet_diagnostic.CA1010.severity = warning  # Le collection devono implementare l'interfaccia generica (IEnumerable<T>)
+dotnet_diagnostic.CA1012.severity = warning  # I tipi astratti non dovrebbero avere costruttori pubblici
+dotnet_diagnostic.CA1040.severity = warning  # Evitare interfacce vuote (usate solo come marker)
+dotnet_diagnostic.CA1041.severity = warning  # Fornire un messaggio nel ObsoleteAttribute
+dotnet_diagnostic.CA1051.severity = warning  # Non dichiarare campi di istanza visibili (usare proprieta')
+dotnet_diagnostic.CA1066.severity = warning  # Implementare IEquatable<T> quando si fa override di Equals
+dotnet_diagnostic.CA1070.severity = warning  # Non dichiarare campi evento come virtual
+
+# -----------------------------------------------------------------------
+# Affidabilita' aggiuntiva (CA2xxx) - warning
+# Pattern di uso scorretto di API comuni .NET.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CA2101.severity = warning  # Specificare marshaling per le stringhe in P/Invoke
+dotnet_diagnostic.CA2229.severity = warning  # Implementare costruttore di serializzazione nei tipi serializzabili
+dotnet_diagnostic.CA2237.severity = warning  # Contrassegnare i tipi ISerializable con [Serializable]
+dotnet_diagnostic.CA2244.severity = warning  # Non duplicare inizializzazioni di elementi indicizzati in object initializer
+dotnet_diagnostic.CA2247.severity = warning  # Passare TaskCreationOptions, non TaskContinuationOptions, a TaskCompletionSource
+dotnet_diagnostic.CA2248.severity = warning  # Accertarsi di passare un valore enum corretto a Enum.HasFlag
+dotnet_diagnostic.CA2249.severity = warning  # Preferire string.Contains(char) rispetto a string.IndexOf(char) >= 0
+dotnet_diagnostic.CA2250.severity = warning  # Preferire string.Concat rispetto a StringBuilder quando concatenazione e' semplice
+dotnet_diagnostic.CA2251.severity = warning  # Preferire string.Equals rispetto a == per confronti espliciti
+dotnet_diagnostic.CA2253.severity = warning  # I segnaposto dei template di log non devono essere valori numerici posizionali
+dotnet_diagnostic.CA2254.severity = warning  # Il template del messaggio di log non deve variare tra le chiamate
+
+# -----------------------------------------------------------------------
+# Codice morto e qualita' del codice (IDE0xxx) - warning
+# Rilevamento di codice non raggiungibile o elementi mai referenziati.
+# -----------------------------------------------------------------------
+dotnet_diagnostic.IDE0044.severity = warning  # Campo che non viene mai scritto puo' essere dichiarato readonly
+dotnet_diagnostic.IDE0051.severity = warning  # Membro privato mai usato (metodo, proprieta', campo)
+dotnet_diagnostic.IDE0052.severity = warning  # Membro privato scritto ma mai letto
+
+
+# -----------------------------------------------------------------------
+# Controllo delle librerie deprecate o con bachi noti.
+# per audit package NuGet: dotnet list package --vulnerable
+# -----------------------------------------------------------------------
+dotnet_diagnostic.CS0618.severity = warning  # controllo sulle api obsolete: Se un metodo o una classe è marcata [Obsolete], verrà mostrata la segnalazione.
