@@ -40,7 +40,7 @@
 
 .NOTES
     Author: Generated for TMED Analysis Reports
-    Version: 1.1.0
+    Version: 1.2.0
     Requires: PowerShell 5.1 or higher
 #>
 
@@ -81,21 +81,6 @@ function LogEr {
     Write-Host $Message -ForegroundColor Red
 }
 
-# Funzione per ottenere la dimensione di un oggetto JSON in byte
-function Get-JsonSize {
-    param([object]$JsonObject)
-    
-    try {
-        $json = $JsonObject | ConvertTo-Json -Depth 100 -Compress
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
-        return $bytes.Length
-    }
-    catch {
-        LogEr "Errore nel calcolo della dimensione JSON: $_"
-        return 0
-    }
-}
-
 # Funzione per creare un chunk SARIF valido
 function New-SarifChunk {
     param(
@@ -104,23 +89,25 @@ function New-SarifChunk {
         [int]$ChunkIndex
     )
     
-    # Crea una copia della struttura SARIF originale
-    $chunk = @{
+    # Crea una copia della struttura SARIF con ordine garantito: $schema, version, (extra props), runs
+    $chunk = [ordered]@{
         '$schema' = if ($null -ne $OriginalSarif.'$schema' -and $OriginalSarif.'$schema' -ne '') { $OriginalSarif.'$schema' } else { 'http://json.schemastore.org/sarif-2.1.0' }
-        'version' = if ($null -ne $OriginalSarif.version -and $OriginalSarif.version -ne '') { $OriginalSarif.version } else { '2.1.0' }
-        'runs' = @()
+        'version'  = if ($null -ne $OriginalSarif.version -and $OriginalSarif.version -ne '') { $OriginalSarif.version } else { '2.1.0' }
     }
     
-    # Se ci sono proprietà aggiuntive a livello root, mantienile
+    # Se ci sono proprietà aggiuntive a livello root, mantienile (prima di runs)
     foreach ($prop in $OriginalSarif.PSObject.Properties) {
         if ($prop.Name -notin @('$schema', 'version', 'runs')) {
             $chunk[$prop.Name] = $prop.Value
         }
     }
     
+    $chunk['runs'] = @()
+    
     # Per ogni run nell'originale, crea una copia con i risultati filtrati
     foreach ($run in $OriginalSarif.runs) {
-        $newRun = @{
+        # Ordine garantito: tool, (altre proprietà del run), results
+        $newRun = [ordered]@{
             'tool' = $run.tool
         }
         
@@ -134,7 +121,7 @@ function New-SarifChunk {
         # Aggiungi i risultati per questo chunk
         $newRun['results'] = $Results
         
-        $chunk.runs += $newRun
+        $chunk['runs'] += $newRun
     }
     
     return $chunk
@@ -200,40 +187,48 @@ function Split-SarifFile {
             @{ Expression = { if ($null -ne $_.ruleId) { $_.ruleId } else { '' } }; Ascending = $true }
         ))
 
-        # Pre-calcola la dimensione dell'overhead SARIF senza risultati (una volta sola)
-        $emptyChunk = New-SarifChunk -OriginalSarif $sarifContent -Results @() -ChunkIndex 0
-        $overheadSize = Get-JsonSize -JsonObject $emptyChunk
-
-        # Pre-calcola la dimensione compressa di ciascun risultato (una volta per ciascuno, O(n))
-        $resultSizes = @($allResults | ForEach-Object {
-            $json = $_ | ConvertTo-Json -Depth 100 -Compress
-            [System.Text.Encoding]::UTF8.GetByteCount($json)
-        })
-
-        # Divide i risultati in chunk usando le stime di dimensione accumulate (O(n))
+        # Divide i risultati in chunk usando binary search sulla dimensione reale serializzata.
+        # Per ogni chunk, si cerca il massimo numero di risultati che sta nel limite misurando
+        # il byte count effettivo del JSON compresso (O(n log n) totale).
         $chunks = [System.Collections.ArrayList]::new()
-        $currentChunk = [System.Collections.ArrayList]::new()
-        $currentSize = $overheadSize
+        $startIdx = 0
 
-        for ($i = 0; $i -lt $allResults.Count; $i++) {
-            $addSize = $resultSizes[$i]
-            if ($currentChunk.Count -gt 0) { $addSize += 1 }  # separatore virgola
+        while ($startIdx -lt $allResults.Count) {
+            $remaining = $allResults.Count - $startIdx
 
-            if (($currentSize + $addSize) -gt $MaxSizeBytes -and $currentChunk.Count -gt 0) {
-                # Salva il chunk corrente e inizia uno nuovo
-                [void]$chunks.Add($currentChunk.ToArray())
-                $currentChunk = [System.Collections.ArrayList]::new()
-                [void]$currentChunk.Add($allResults[$i])
-                $currentSize = $overheadSize + $resultSizes[$i]
-            } else {
-                [void]$currentChunk.Add($allResults[$i])
-                $currentSize += $addSize
+            # Ottimizzazione: controlla prima se tutti i risultati rimanenti stanno nel limite
+            $testResults = @($allResults[$startIdx..($allResults.Count - 1)])
+            $testChunk   = New-SarifChunk -OriginalSarif $sarifContent -Results $testResults -ChunkIndex 0
+            $testSize    = [System.Text.Encoding]::UTF8.GetByteCount(($testChunk | ConvertTo-Json -Depth 100 -Compress))
+
+            if ($testSize -le $MaxSizeBytes) {
+                [void]$chunks.Add($testResults)
+                $startIdx += $remaining
+                continue
             }
-        }
 
-        # Aggiungi l'ultimo chunk se non è vuoto
-        if ($currentChunk.Count -gt 0) {
-            [void]$chunks.Add($currentChunk.ToArray())
+            # Binary search: trova il numero massimo di risultati che sta nel limite
+            $lo      = 1
+            $hi      = $remaining - 1  # il caso "tutti i rimanenti" è già stato verificato sopra
+            $bestFit = 1  # Includi sempre almeno 1 risultato (anche se supera il limite)
+
+            while ($lo -le $hi) {
+                $mid         = [int](($lo + $hi) / 2)
+                $endIdx      = [Math]::Min($startIdx + $mid - 1, $allResults.Count - 1)
+                $testResults = @($allResults[$startIdx..$endIdx])
+                $testChunk   = New-SarifChunk -OriginalSarif $sarifContent -Results $testResults -ChunkIndex 0
+                $testSize    = [System.Text.Encoding]::UTF8.GetByteCount(($testChunk | ConvertTo-Json -Depth 100 -Compress))
+
+                if ($testSize -le $MaxSizeBytes) {
+                    $bestFit = $mid
+                    $lo = $mid + 1
+                } else {
+                    $hi = $mid - 1
+                }
+            }
+
+            [void]$chunks.Add(@($allResults[$startIdx..($startIdx + $bestFit - 1)]))
+            $startIdx += $bestFit
         }
         
         # Salva tutti i chunk
