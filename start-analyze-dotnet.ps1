@@ -183,7 +183,7 @@ function Merge-SarifFiles {
                         }
                         LogWn "  Dropped from $(Split-Path -Leaf $file): $($msgParts -join ', ')"
                     }
-                    $run.results = $kept.ToArray()
+                    $run.results = $kept
                 }
 
                 $allRuns.Add($run)
@@ -291,7 +291,7 @@ function Remove-EmptyUriResults {
                 [void]$kept.Add($result)
             }
 
-            $run.results = $kept.ToArray()
+            $run.results = $kept
             $totalDroppedEmptyUri += $droppedEmptyUri
             $totalDroppedExcluded += $droppedExcluded
         }
