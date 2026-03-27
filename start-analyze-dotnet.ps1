@@ -85,8 +85,9 @@ function Merge-SarifFiles {
         [string[]]$ExcludedFolderPatterns = @()
     )
 
-    $allRuns      = [System.Collections.Generic.List[object]]::new()
-    $totalDropped = 0
+    $allRuns              = [System.Collections.Generic.List[object]]::new()
+    $totalDroppedEmptyUri = 0
+    $totalDroppedExcluded = 0
 
     foreach ($file in $InputFiles) {
         if (-not (Test-Path -LiteralPath $file)) { continue }
@@ -119,42 +120,68 @@ function Merge-SarifFiles {
                 # ------------------------------------------------------------------
                 if ($run.PSObject.Properties['results'] -and $run.results) {
                     $before = @($run.results).Count
-                    $kept   = @($run.results) | Where-Object {
+                    $droppedEmptyUri = 0
+                    $droppedExcluded = 0
+                    
+                    # Filter results and track exclusion reasons
+                    $kept = [System.Collections.Generic.List[object]]::new()
+                    foreach ($result in @($run.results)) {
                         $loc = $null
-                        if ($_.PSObject.Properties['locations'] -and $_.locations) {
-                            $loc = @($_.locations)[0]
+                        if ($result.PSObject.Properties['locations'] -and $result.locations) {
+                            $loc = @($result.locations)[0]
                         }
-                        if (-not $loc) { return $false }   # no location at all → drop
+                        if (-not $loc) { 
+                            $droppedEmptyUri++
+                            continue
+                        }
 
                         $pl = $null
                         if ($loc.PSObject.Properties['physicalLocation'] -and $loc.physicalLocation) {
                             $pl = $loc.physicalLocation
                         }
-                        if (-not $pl) { return $false }    # no physical location → drop
+                        if (-not $pl) { 
+                            $droppedEmptyUri++
+                            continue
+                        }
 
                         $al = $null
                         if ($pl.PSObject.Properties['artifactLocation'] -and $pl.artifactLocation) {
                             $al = $pl.artifactLocation
                         }
-                        if (-not $al) { return $false }    # no artifactLocation → drop
+                        if (-not $al) { 
+                            $droppedEmptyUri++
+                            continue
+                        }
 
                         # Drop if uri is absent or empty
                         if (-not ($al.PSObject.Properties['uri'] -and
                                   -not [string]::IsNullOrWhiteSpace([string]$al.uri))) {
-                            return $false
+                            $droppedEmptyUri++
+                            continue
                         }
 
                         # Drop if the file is in an excluded folder
                         if (Test-IsExcludedUri -RawUri ([string]$al.uri) -ExcludedFolderPatterns $ExcludedFolderPatterns) {
-                            return $false
+                            $droppedExcluded++
+                            continue
                         }
 
-                        return $true
+                        # Keep this result
+                        [void]$kept.Add($result)
                     }
-                    $dropped = $before - @($kept).Count
-                    $totalDropped += $dropped
-                    if ($dropped -gt 0) {
-                        LogWn "  Dropped $dropped result(s) with empty URI from $(Split-Path -Leaf $file)"
+                    
+                    $totalDroppedEmptyUri += $droppedEmptyUri
+                    $totalDroppedExcluded += $droppedExcluded
+                    
+                    if ($droppedEmptyUri -gt 0 -or $droppedExcluded -gt 0) {
+                        $msgParts = @()
+                        if ($droppedEmptyUri -gt 0) {
+                            $msgParts += "$droppedEmptyUri with empty URI"
+                        }
+                        if ($droppedExcluded -gt 0) {
+                            $msgParts += "$droppedExcluded in excluded folders"
+                        }
+                        LogWn "  Dropped from $(Split-Path -Leaf $file): $($msgParts -join ', ')"
                     }
                     $run.results = $kept
                 }
@@ -165,8 +192,11 @@ function Merge-SarifFiles {
         catch { LogWn "Could not parse SARIF: $(Split-Path -Leaf $file)" }
     }
 
-    if ($totalDropped -gt 0) {
-        LogWn "Total results dropped (empty URI): $totalDropped"
+    if ($totalDroppedEmptyUri -gt 0) {
+        LogWn "Total results dropped (empty URI): $totalDroppedEmptyUri"
+    }
+    if ($totalDroppedExcluded -gt 0) {
+        LogWn "Total results dropped (excluded folders): $totalDroppedExcluded"
     }
 
     $merged = [ordered]@{
@@ -204,50 +234,77 @@ function Remove-EmptyUriResults {
 
         if (-not ($sarif.PSObject.Properties['runs'] -and $sarif.runs)) { return }
 
-        $totalDropped = 0
+        $totalDroppedEmptyUri = 0
+        $totalDroppedExcluded = 0
+        
         foreach ($run in @($sarif.runs)) {
             if (-not ($run.PSObject.Properties['results'] -and $run.results)) { continue }
 
             $before = @($run.results).Count
-            $run.results = @($run.results) | Where-Object {
+            $droppedEmptyUri = 0
+            $droppedExcluded = 0
+            
+            # Filter results and track exclusion reasons
+            $kept = [System.Collections.Generic.List[object]]::new()
+            foreach ($result in @($run.results)) {
                 $loc = $null
-                if ($_.PSObject.Properties['locations'] -and $_.locations) {
-                    $loc = @($_.locations)[0]
+                if ($result.PSObject.Properties['locations'] -and $result.locations) {
+                    $loc = @($result.locations)[0]
                 }
-                if (-not $loc) { return $false }
+                if (-not $loc) { 
+                    $droppedEmptyUri++
+                    continue
+                }
 
                 $pl = $null
                 if ($loc.PSObject.Properties['physicalLocation'] -and $loc.physicalLocation) {
                     $pl = $loc.physicalLocation
                 }
-                if (-not $pl) { return $false }
+                if (-not $pl) { 
+                    $droppedEmptyUri++
+                    continue
+                }
 
                 $al = $null
                 if ($pl.PSObject.Properties['artifactLocation'] -and $pl.artifactLocation) {
                     $al = $pl.artifactLocation
                 }
-                if (-not $al) { return $false }
+                if (-not $al) { 
+                    $droppedEmptyUri++
+                    continue
+                }
 
                 # Drop if uri is absent or empty
                 if (-not ($al.PSObject.Properties['uri'] -and
                           -not [string]::IsNullOrWhiteSpace([string]$al.uri))) {
-                    return $false
+                    $droppedEmptyUri++
+                    continue
                 }
 
                 # Drop if the file is in an excluded folder
                 if (Test-IsExcludedUri -RawUri ([string]$al.uri) -ExcludedFolderPatterns $ExcludedFolderPatterns) {
-                    return $false
+                    $droppedExcluded++
+                    continue
                 }
 
-                return $true
+                # Keep this result
+                [void]$kept.Add($result)
             }
 
-            $dropped = $before - @($run.results).Count
-            $totalDropped += $dropped
+            $run.results = $kept
+            $totalDroppedEmptyUri += $droppedEmptyUri
+            $totalDroppedExcluded += $droppedExcluded
         }
 
-        if ($totalDropped -gt 0) {
-            LogWn "  Removed $totalDropped result(s) with empty URI from $(Split-Path -Leaf $SarifFile)"
+        if ($totalDroppedEmptyUri -gt 0 -or $totalDroppedExcluded -gt 0) {
+            $msgParts = @()
+            if ($totalDroppedEmptyUri -gt 0) {
+                $msgParts += "$totalDroppedEmptyUri with empty URI"
+            }
+            if ($totalDroppedExcluded -gt 0) {
+                $msgParts += "$totalDroppedExcluded in excluded folders"
+            }
+            LogWn "  Removed from $(Split-Path -Leaf $SarifFile): $($msgParts -join ', ')"
             $sarif | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $SarifFile -Encoding UTF8
         }
     }
