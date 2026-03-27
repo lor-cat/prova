@@ -106,8 +106,8 @@ function New-SarifChunk {
     
     # Crea una copia della struttura SARIF originale
     $chunk = @{
-        '$schema' = $OriginalSarif.'$schema'
-        'version' = $OriginalSarif.version
+        '$schema' = if ($null -ne $OriginalSarif.'$schema' -and $OriginalSarif.'$schema' -ne '') { $OriginalSarif.'$schema' } else { 'http://json.schemastore.org/sarif-2.1.0' }
+        'version' = if ($null -ne $OriginalSarif.version -and $OriginalSarif.version -ne '') { $OriginalSarif.version } else { '2.1.0' }
         'runs' = @()
     }
     
@@ -246,7 +246,7 @@ function Split-SarifFile {
             $chunkFileName = "$baseFileName-chunk$($i + 1)$extension"
             $chunkPath = Join-Path $OutputDir $chunkFileName
             
-            $chunk | ConvertTo-Json -Depth 100 | Set-Content -Path $chunkPath -Encoding UTF8
+            $chunk | ConvertTo-Json -Depth 100 -Compress | Set-Content -Path $chunkPath -Encoding UTF8
             
             $chunkSize = (Get-Item $chunkPath).Length
             $chunkSizeMB = [math]::Round($chunkSize / 1MB, 2)
