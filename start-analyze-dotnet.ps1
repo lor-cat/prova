@@ -124,7 +124,7 @@ function Merge-SarifFiles {
                     $droppedExcluded = 0
                     
                     # First pass: categorize each result
-                    $kept = [System.Collections.ArrayList]::new()
+                    $kept = [System.Collections.Generic.List[object]]::new()
                     foreach ($result in @($run.results)) {
                         $loc = $null
                         if ($result.PSObject.Properties['locations'] -and $result.locations) {
@@ -245,7 +245,7 @@ function Remove-EmptyUriResults {
             $droppedExcluded = 0
             
             # Process each result
-            $kept = [System.Collections.ArrayList]::new()
+            $kept = [System.Collections.Generic.List[object]]::new()
             foreach ($result in @($run.results)) {
                 $loc = $null
                 if ($result.PSObject.Properties['locations'] -and $result.locations) {
