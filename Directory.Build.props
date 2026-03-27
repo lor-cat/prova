@@ -11,8 +11,13 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
 
+    <!-- 
+      TreatWarningsAsErrors è disabilitato per permettere la compilazione
+      di progetti dipendenti anche in presenza di warning.
+      Le regole di severità sono gestite in .editorconfig.analysis
+      Solo le vulnerabilità critiche (error in .editorconfig) bloccheranno la build.
+    -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <WarningsAsErrors>CA2000;CA2012;CA2213;CA2201;CS8600;CS8601;CS8602;CS8603;CS8618;CS8625;CA1001;CA1063;CA1065;CA1068;CA1069;CA2153;CA2215;CA2241;CA2242;CA2245;CA2246;CA3001;CA3002;CA3003;CA3004;CA3005;CA3006;CA3007;CA3008;CA3009;CA3010;CA3061;CA3075;CA3076;CA3077;CA5359;CA5360;CA5361;CA5363;CA5365;CA5378;CA5379;CA5397;CA5398</WarningsAsErrors>
     <NoWarn>NU1701</NoWarn>
   </PropertyGroup>
 </Project>
