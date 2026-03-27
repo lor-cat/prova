@@ -174,14 +174,14 @@ function Merge-SarifFiles {
                     $totalDroppedExcluded += $droppedExcluded
                     
                     if ($droppedEmptyUri -gt 0 -or $droppedExcluded -gt 0) {
-                        $msg = "  Dropped from $(Split-Path -Leaf $file):"
+                        $msgParts = @()
                         if ($droppedEmptyUri -gt 0) {
-                            $msg += " $droppedEmptyUri with empty URI,"
+                            $msgParts += "$droppedEmptyUri with empty URI"
                         }
                         if ($droppedExcluded -gt 0) {
-                            $msg += " $droppedExcluded in excluded folders"
+                            $msgParts += "$droppedExcluded in excluded folders"
                         }
-                        LogWn $msg
+                        LogWn "  Dropped from $(Split-Path -Leaf $file): $($msgParts -join ', ')"
                     }
                     $run.results = $kept.ToArray()
                 }
@@ -297,14 +297,14 @@ function Remove-EmptyUriResults {
         }
 
         if ($totalDroppedEmptyUri -gt 0 -or $totalDroppedExcluded -gt 0) {
-            $msg = "  Removed from $(Split-Path -Leaf $SarifFile):"
+            $msgParts = @()
             if ($totalDroppedEmptyUri -gt 0) {
-                $msg += " $totalDroppedEmptyUri with empty URI,"
+                $msgParts += "$totalDroppedEmptyUri with empty URI"
             }
             if ($totalDroppedExcluded -gt 0) {
-                $msg += " $totalDroppedExcluded in excluded folders"
+                $msgParts += "$totalDroppedExcluded in excluded folders"
             }
-            LogWn $msg
+            LogWn "  Removed from $(Split-Path -Leaf $SarifFile): $($msgParts -join ', ')"
             $sarif | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $SarifFile -Encoding UTF8
         }
     }
