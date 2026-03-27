@@ -13,7 +13,7 @@ Questo è utile quando i file SARIF generati dalle analisi statiche sono troppo 
 ### Sintassi di Base
 
 ```powershell
-.\SarifSplitter.ps1 [-InputFolder <percorso>] [-ChunkSizeMB <dimensione>] [-OutputFolder <nome>] [-Force]
+.\_SarifSplitter.ps1 [-InputFolder <percorso>] [-ChunkSizeMB <dimensione>] [-OutputFolder <nome>] [-Force]
 ```
 
 ### Parametri
@@ -44,28 +44,28 @@ Questo è utile quando i file SARIF generati dalle analisi statiche sono troppo 
 Divide tutti i file SARIF nella cartella corrente in chunk da 5 MB:
 
 ```powershell
-.\SarifSplitter.ps1
+.\_SarifSplitter.ps1
 ```
 
 #### Esempio 2: Specifica Cartella e Dimensione
 Divide tutti i file SARIF in una cartella specifica con chunk da 10 MB:
 
 ```powershell
-.\SarifSplitter.ps1 -InputFolder "C:\AnalysisReports" -ChunkSizeMB 10
+.\_SarifSplitter.ps1 -InputFolder "C:\AnalysisReports" -ChunkSizeMB 10
 ```
 
 #### Esempio 3: Sovrascrittura Output
 Divide i file SARIF in chunk da 3 MB, sovrascrivendo l'output esistente:
 
 ```powershell
-.\SarifSplitter.ps1 -ChunkSizeMB 3 -Force
+.\_SarifSplitter.ps1 -ChunkSizeMB 3 -Force
 ```
 
 #### Esempio 4: Cartella di Output Personalizzata
 Usa una cartella di output personalizzata:
 
 ```powershell
-.\SarifSplitter.ps1 -OutputFolder "SarifDivisi" -ChunkSizeMB 8
+.\_SarifSplitter.ps1 -OutputFolder "SarifDivisi" -ChunkSizeMB 8
 ```
 
 ## Funzionamento
@@ -179,7 +179,7 @@ Esempio di workflow:
 
 # 2. Dividi i file SARIF se necessario
 cd AnalysisReports\per-project
-.\SarifSplitter.ps1 -ChunkSizeMB 5 -Force
+.\_SarifSplitter.ps1 -ChunkSizeMB 5 -Force
 ```
 
 ## Autore

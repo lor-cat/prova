@@ -27,15 +27,15 @@
     Se specificato, sovrascrive la cartella di output esistente.
 
 .EXAMPLE
-    .\SarifSplitter.ps1
+    .\_SarifSplitter.ps1
     Divide tutti i file SARIF nella cartella corrente in chunk da 5 MB
 
 .EXAMPLE
-    .\SarifSplitter.ps1 -InputFolder "C:\Reports" -ChunkSizeMB 10
+    .\_SarifSplitter.ps1 -InputFolder "C:\Reports" -ChunkSizeMB 10
     Divide tutti i file SARIF in C:\Reports in chunk da 10 MB
 
 .EXAMPLE
-    .\SarifSplitter.ps1 -InputFolder "." -ChunkSizeMB 3 -Force
+    .\_SarifSplitter.ps1 -InputFolder "." -ChunkSizeMB 3 -Force
     Divide i file SARIF in chunk da 3 MB, sovrascrivendo l'output esistente
 
 .NOTES
