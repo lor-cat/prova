@@ -1,0 +1,7 @@
+# Ignore chunked SARIF output
+ChunkedSarif/
+
+# Ignore test SARIF files
+test*.sarif
+demo*.sarif
+large-test*.sarif
