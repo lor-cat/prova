@@ -78,7 +78,10 @@ Lo script esegue le seguenti operazioni:
    - Calcola la dimensione del file
    - Se il file è sotto il limite, lo copia direttamente
    - Se il file supera il limite, lo divide in chunk
-3. **Divisione**: I risultati SARIF vengono divisi mantenendo:
+3. **Ordinamento**: Prima di dividere il file, i risultati vengono ordinati per:
+   - Criticità decrescente: `error` → `warning` → `note` → `none`
+   - Codice diagnostico (`ruleId`) in ordine alfabetico crescente
+4. **Divisione**: I risultati SARIF vengono divisi mantenendo:
    - La struttura del documento SARIF 2.1.0
    - Le informazioni sul tool analyzer
    - Le proprietà originalUriBaseIds
@@ -188,4 +191,4 @@ Generato per TMED Analysis Reports
 
 ## Versione
 
-1.0.0
+1.1.0
