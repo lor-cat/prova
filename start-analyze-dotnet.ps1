@@ -9,10 +9,55 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# ---------------------------------------------------------------------------
+# Folders whose diagnostics are excluded from the final SARIF output.
+# Paths are relative to the solution root; both forward and back slashes are
+# accepted. Matching is case-insensitive and limited to exact path segments
+# (e.g. 'Tmed.Core/Migrations' will NOT match 'Tmed.Core/MigrationsBackup'
+# or 'OldTmed.Core/Migrations').
+# ---------------------------------------------------------------------------
+$ExcludedFolders = @(
+    'Tmed.Core/Migrations'
+)
+
+# Pre-compute regex patterns from $ExcludedFolders once at startup.
+# Each pattern anchors the folder to path-segment boundaries.
+$ExcludedFolderPatterns = @(
+    $ExcludedFolders |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object {
+            '(^|/)' + [regex]::Escape($_.ToLower().Replace('\', '/').Trim('/')) + '(/|$)'
+        }
+)
+
 function Log   { param([string]$msg) Write-Host "  $msg" }
 function LogOk { param([string]$msg) Write-Host "  [OK]  $msg" -ForegroundColor Green }
 function LogWn { param([string]$msg) Write-Host "  [WRN] $msg" -ForegroundColor Yellow }
 function LogEr { param([string]$msg) Write-Host "  [ERR] $msg" -ForegroundColor Red }
+
+function Test-IsExcludedUri {
+    <#
+    .SYNOPSIS
+        Returns $true when the given SARIF artifact URI falls inside one of the
+        excluded folders. Accepts pre-normalized regex patterns (built from
+        $ExcludedFolderPatterns) to avoid recomputing them on every call.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RawUri,
+        [string[]]$ExcludedFolderPatterns = @()
+    )
+
+    if ($ExcludedFolderPatterns.Count -eq 0) { return $false }
+
+    # Normalize the URI once: lowercase + forward slashes.
+    $normalizedUri = $RawUri.ToLower().Replace('\', '/')
+
+    foreach ($pattern in $ExcludedFolderPatterns) {
+        if ($normalizedUri -match $pattern) { return $true }
+    }
+
+    return $false
+}
 
 function Resolve-FullPath {
     param([Parameter(Mandatory = $true)][string]$PathValue)
@@ -36,7 +81,8 @@ function Merge-SarifFiles {
     param(
         [Parameter(Mandatory = $true)][string[]]$InputFiles,
         [Parameter(Mandatory = $true)][string]$OutputFile,
-        [string]$RepoRootUri = ''
+        [string]$RepoRootUri = '',
+        [string[]]$ExcludedFolderPatterns = @()
     )
 
     $allRuns      = [System.Collections.Generic.List[object]]::new()
@@ -67,8 +113,9 @@ function Merge-SarifFiles {
                 }
 
                 # ------------------------------------------------------------------
-                # 2. Drop results whose primary location has an empty / missing URI.
-                #    These cause "URI non valido: URI vuoto" in the SARIF Viewer.
+                # 2. Drop results whose primary location has an empty / missing URI
+                #    or falls inside an excluded folder.
+                #    Empty URIs cause "URI non valido: URI vuoto" in the SARIF Viewer.
                 # ------------------------------------------------------------------
                 if ($run.PSObject.Properties['results'] -and $run.results) {
                     $before = @($run.results).Count
@@ -91,9 +138,18 @@ function Merge-SarifFiles {
                         }
                         if (-not $al) { return $false }    # no artifactLocation → drop
 
-                        # Keep only if uri is present and non-empty
-                        return ($al.PSObject.Properties['uri'] -and
-                                -not [string]::IsNullOrWhiteSpace([string]$al.uri))
+                        # Drop if uri is absent or empty
+                        if (-not ($al.PSObject.Properties['uri'] -and
+                                  -not [string]::IsNullOrWhiteSpace([string]$al.uri))) {
+                            return $false
+                        }
+
+                        # Drop if the file is in an excluded folder
+                        if (Test-IsExcludedUri -RawUri ([string]$al.uri) -ExcludedFolderPatterns $ExcludedFolderPatterns) {
+                            return $false
+                        }
+
+                        return $true
                     }
                     $dropped = $before - @($kept).Count
                     $totalDropped += $dropped
@@ -126,13 +182,18 @@ function Merge-SarifFiles {
 function Remove-EmptyUriResults {
     <#
     .SYNOPSIS
-        Strips results without a valid physicalLocation URI from a per-project SARIF file.
+        Strips results without a valid physicalLocation URI, or whose location
+        falls inside an excluded folder, from a per-project SARIF file.
     .NOTES
-        These are project-level diagnostics (e.g. EnableGenerateDocumentationFile) that
-        Roslyn/MSBuild emits without a source location.  The SARIF Viewer for Visual Studio
-        cannot handle them and raises "URI non valido: URI vuoto" when it tries to open the file.
+        Results without a source location are project-level diagnostics (e.g.
+        EnableGenerateDocumentationFile) that Roslyn/MSBuild emits without a
+        source file.  The SARIF Viewer for Visual Studio cannot handle them and
+        raises "URI non valido: URI vuoto" when it tries to open the file.
     #>
-    param([Parameter(Mandatory = $true)][string]$SarifFile)
+    param(
+        [Parameter(Mandatory = $true)][string]$SarifFile,
+        [string[]]$ExcludedFolderPatterns = @()
+    )
 
     if (-not (Test-Path -LiteralPath $SarifFile)) { return }
 
@@ -167,8 +228,18 @@ function Remove-EmptyUriResults {
                 }
                 if (-not $al) { return $false }
 
-                return ($al.PSObject.Properties['uri'] -and
-                        -not [string]::IsNullOrWhiteSpace([string]$al.uri))
+                # Drop if uri is absent or empty
+                if (-not ($al.PSObject.Properties['uri'] -and
+                          -not [string]::IsNullOrWhiteSpace([string]$al.uri))) {
+                    return $false
+                }
+
+                # Drop if the file is in an excluded folder
+                if (Test-IsExcludedUri -RawUri ([string]$al.uri) -ExcludedFolderPatterns $ExcludedFolderPatterns) {
+                    return $false
+                }
+
+                return $true
             }
 
             $dropped = $before - @($run.results).Count
@@ -190,7 +261,8 @@ function Invoke-AnalyzerBuild {
         [Parameter(Mandatory = $true)][string]$SolutionPath,
         [Parameter(Mandatory = $true)][string]$PerProjectSarifDir,
         [Parameter(Mandatory = $true)][string]$FinalSarifPath,
-        [array]$Projects = @()
+        [array]$Projects = @(),
+        [string[]]$ExcludedFolderPatterns = @()
     )
 
     $solutionDir  = Split-Path -Parent $SolutionPath
@@ -339,14 +411,13 @@ dotnet_diagnostic.CA5398.severity = warning
         LogOk "Per-project SARIF files generated ($($sarifFiles.Count)):"
         foreach ($sf in $sarifFiles) { Log "    $(Split-Path -Leaf $sf)" }
 
-        # Remove results with empty/missing URIs from each per-project SARIF so that the
-        # SARIF Viewer for Visual Studio does not raise "URI non valido: URI vuoto" when
-        # these files are opened directly (e.g. from the solution explorer or via the viewer
-        # tool window).  The same filter is applied again inside Merge-SarifFiles as a
-        # safety net, but cleaning the source files here ensures individual per-project
-        # files are also safe to open.
+        # Remove results with empty/missing URIs (and results in excluded folders) from each
+        # per-project SARIF so that the SARIF Viewer for Visual Studio does not raise
+        # "URI non valido: URI vuoto" when these files are opened directly.
+        # The same filter is applied again inside Merge-SarifFiles as a safety net, but
+        # cleaning the source files here ensures individual per-project files are also safe.
         Log "Cleaning empty-URI results from per-project SARIF files..."
-        foreach ($sf in $sarifFiles) { Remove-EmptyUriResults -SarifFile $sf }
+        foreach ($sf in $sarifFiles) { Remove-EmptyUriResults -SarifFile $sf -ExcludedFolderPatterns $ExcludedFolderPatterns }
 
         # Build a file:/// URI for the repo root so originalUriBaseIds is populated
         $repoRootUri = ''
@@ -355,7 +426,7 @@ dotnet_diagnostic.CA5398.severity = warning
             $repoRootUri  = [System.Uri]::new($repoRootNorm).AbsoluteUri
         } catch { }
 
-        Merge-SarifFiles -InputFiles $sarifFiles -OutputFile $FinalSarifPath -RepoRootUri $repoRootUri
+        Merge-SarifFiles -InputFiles $sarifFiles -OutputFile $FinalSarifPath -RepoRootUri $repoRootUri -ExcludedFolderPatterns $ExcludedFolderPatterns
     }
     else {
         LogWn "No per-project SARIF files generated - check that analyzers ran"
@@ -613,14 +684,20 @@ LogOk "Solution selected: $SolutionPath"
 $solutionProjects = Get-SolutionProjects -SolutionFile $SolutionPath
 LogOk "Found $($solutionProjects.Count) project(s) in solution"
 
+if ($ExcludedFolders.Count -gt 0) {
+    LogWn "Excluded folders ($($ExcludedFolders.Count)):"
+    foreach ($ef in $ExcludedFolders) { Log "    $ef" }
+}
+
 $perProjectSarifDir = Join-Path -Path $OutputDirFull -ChildPath 'per-project'
 Log "Running analyzer build for solution..."
 
 $buildExitCode = Invoke-AnalyzerBuild `
-    -SolutionPath       $SolutionPath `
-    -PerProjectSarifDir $perProjectSarifDir `
-    -FinalSarifPath     $sarifPath `
-    -Projects           $solutionProjects
+    -SolutionPath          $SolutionPath `
+    -PerProjectSarifDir    $perProjectSarifDir `
+    -FinalSarifPath        $sarifPath `
+    -Projects              $solutionProjects `
+    -ExcludedFolderPatterns $ExcludedFolderPatterns
 
 if ($buildExitCode -ne 0) {
     LogWn "dotnet build exited with code $buildExitCode"
