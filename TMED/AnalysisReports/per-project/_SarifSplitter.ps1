@@ -208,7 +208,7 @@ function Split-SarifFile {
                 $currentChunk = $currentChunk[0..($currentChunk.Count - 2)]
                 
                 # Salva il chunk corrente
-                $chunks += ,@($currentChunk)
+                $chunks += @($currentChunk)
                 
                 # Inizia un nuovo chunk con l'ultimo risultato
                 $currentChunk = @($result)
@@ -218,7 +218,7 @@ function Split-SarifFile {
         
         # Aggiungi l'ultimo chunk se non è vuoto
         if ($currentChunk.Count -gt 0) {
-            $chunks += ,@($currentChunk)
+            $chunks += @($currentChunk)
         }
         
         # Salva tutti i chunk
