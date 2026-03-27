@@ -40,7 +40,7 @@
 
 .NOTES
     Author: Generated for TMED Analysis Reports
-    Version: 1.0.0
+    Version: 1.1.0
     Requires: PowerShell 5.1 or higher
 #>
 
@@ -164,7 +164,7 @@ function Split-SarifFile {
         $allResults = @()
         foreach ($run in $sarifContent.runs) {
             if ($run.results) {
-                $allResults += $run.results
+                $allResults += @($run.results)
             }
         }
         
@@ -190,35 +190,50 @@ function Split-SarifFile {
             return 1
         }
         
-        # Divide i risultati in chunk
-        $chunks = @()
-        $currentChunk = @()
-        $chunkIndex = 0
-        
-        foreach ($result in $allResults) {
-            $currentChunk += $result
-            
-            # Crea un chunk temporaneo per verificare la dimensione
-            $tempChunk = New-SarifChunk -OriginalSarif $sarifContent -Results $currentChunk -ChunkIndex $chunkIndex
-            $chunkSize = Get-JsonSize -JsonObject $tempChunk
-            
-            # Se il chunk supera il limite, salva il chunk precedente e inizia uno nuovo
-            if ($chunkSize -gt $MaxSizeBytes -and $currentChunk.Count -gt 1) {
-                # Rimuovi l'ultimo risultato aggiunto
-                $currentChunk = $currentChunk[0..($currentChunk.Count - 2)]
-                
-                # Salva il chunk corrente
-                $chunks += @($currentChunk)
-                
-                # Inizia un nuovo chunk con l'ultimo risultato
-                $currentChunk = @($result)
-                $chunkIndex++
+        # Ordina i risultati: prima per criticità (error > warning > note > none), poi per ruleId
+        $severityOrder = @{ 'error' = 0; 'warning' = 1; 'note' = 2; 'none' = 3 }
+        $allResults = @($allResults | Sort-Object -Property @(
+            @{ Expression = {
+                $lvl = $_.level
+                if ($null -ne $lvl -and $severityOrder.ContainsKey($lvl)) { $severityOrder[$lvl] } else { 4 }
+            }; Ascending = $true },
+            @{ Expression = { if ($null -ne $_.ruleId) { $_.ruleId } else { '' } }; Ascending = $true }
+        ))
+
+        # Pre-calcola la dimensione dell'overhead SARIF senza risultati (una volta sola)
+        $emptyChunk = New-SarifChunk -OriginalSarif $sarifContent -Results @() -ChunkIndex 0
+        $overheadSize = Get-JsonSize -JsonObject $emptyChunk
+
+        # Pre-calcola la dimensione compressa di ciascun risultato (una volta per ciascuno, O(n))
+        $resultSizes = @($allResults | ForEach-Object {
+            $json = $_ | ConvertTo-Json -Depth 100 -Compress
+            [System.Text.Encoding]::UTF8.GetByteCount($json)
+        })
+
+        # Divide i risultati in chunk usando le stime di dimensione accumulate (O(n))
+        $chunks = [System.Collections.ArrayList]::new()
+        $currentChunk = [System.Collections.ArrayList]::new()
+        $currentSize = $overheadSize
+
+        for ($i = 0; $i -lt $allResults.Count; $i++) {
+            $addSize = $resultSizes[$i]
+            if ($currentChunk.Count -gt 0) { $addSize += 1 }  # separatore virgola
+
+            if (($currentSize + $addSize) -gt $MaxSizeBytes -and $currentChunk.Count -gt 0) {
+                # Salva il chunk corrente e inizia uno nuovo
+                [void]$chunks.Add($currentChunk.ToArray())
+                $currentChunk = [System.Collections.ArrayList]::new()
+                [void]$currentChunk.Add($allResults[$i])
+                $currentSize = $overheadSize + $resultSizes[$i]
+            } else {
+                [void]$currentChunk.Add($allResults[$i])
+                $currentSize += $addSize
             }
         }
-        
+
         # Aggiungi l'ultimo chunk se non è vuoto
         if ($currentChunk.Count -gt 0) {
-            $chunks += @($currentChunk)
+            [void]$chunks.Add($currentChunk.ToArray())
         }
         
         # Salva tutti i chunk
